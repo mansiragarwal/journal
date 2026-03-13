@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { sendDailyReminder, sendWeeklyReminder } from "@/lib/email";
+import { sendDailyReminder, sendWeeklyReminder } from "@/lib/telegram";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
