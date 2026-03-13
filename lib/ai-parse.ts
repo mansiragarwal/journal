@@ -45,7 +45,7 @@ export async function parseDailyReply(
   text: string
 ): Promise<ParsedDailyResponse> {
   const message = await anthropic.messages.create({
-    model: "claude-haiku-4-20250414",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 150,
     system: DAILY_SYSTEM,
     messages: [{ role: "user", content: text }],
@@ -72,7 +72,7 @@ export async function parseWeeklyReply(
   text: string
 ): Promise<ParsedWeeklyResponse> {
   const message = await anthropic.messages.create({
-    model: "claude-haiku-4-20250414",
+    model: "claude-haiku-4-5-20251001",
     max_tokens: 100,
     system: WEEKLY_SYSTEM,
     messages: [{ role: "user", content: text }],
