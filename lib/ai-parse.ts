@@ -1,7 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ParsedDailyResponse, ParsedWeeklyResponse } from "./parse";
+import type { BingoItem } from "./utils";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+function extractJSON(text: string): string {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) return fenced[1].trim();
+  return text.trim();
+}
 
 const DAILY_SYSTEM = `You parse natural language messages about daily goal completion into JSON.
 
@@ -56,7 +63,7 @@ export async function parseDailyReply(
     throw new Error("Unexpected response type from Claude");
   }
 
-  const parsed = JSON.parse(content.text);
+  const parsed = JSON.parse(extractJSON(content.text));
 
   return {
     walking_10k: Boolean(parsed.walking_10k),
@@ -83,11 +90,40 @@ export async function parseWeeklyReply(
     throw new Error("Unexpected response type from Claude");
   }
 
-  const parsed = JSON.parse(content.text);
+  const parsed = JSON.parse(extractJSON(content.text));
 
   return {
     yoga: Boolean(parsed.yoga),
     pilates: Boolean(parsed.pilates),
     weightlifting: Number(parsed.weightlifting) || 0,
   };
+}
+
+export async function parseBingoReply(
+  text: string,
+  items: BingoItem[]
+): Promise<BingoItem[]> {
+  const itemList = items.map((i) => `${i.id}: "${i.title}"`).join("\n");
+
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 200,
+    system: `You match a user's message to bingo board items they've completed.
+
+Here are all the bingo items:
+${itemList}
+
+Return a JSON array of the IDs that match what the user is describing.
+If nothing matches, return an empty array.
+
+Respond with ONLY a valid JSON array of numbers, no markdown, no explanation.
+Example: [15] or [3, 7] or []`,
+    messages: [{ role: "user", content: text }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") return [];
+
+  const ids: number[] = JSON.parse(extractJSON(content.text));
+  return items.filter((i) => ids.includes(i.id));
 }

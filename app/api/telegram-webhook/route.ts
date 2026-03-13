@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { sendMessage } from "@/lib/telegram";
-import { parseDailyReply, parseWeeklyReply } from "@/lib/ai-parse";
-import { upsertDailyLog, upsertWeeklyLog } from "@/lib/db";
+import { parseDailyReply, parseWeeklyReply, parseBingoReply } from "@/lib/ai-parse";
+import { upsertDailyLog, upsertWeeklyLog, getBingoItems, updateBingoItem } from "@/lib/db";
 import { todayStr, weekStartStr } from "@/lib/utils";
 
 interface TelegramUpdate {
@@ -15,17 +15,14 @@ function isAuthorizedChat(chatId: number): boolean {
   return String(chatId) === process.env.TELEGRAM_CHAT_ID;
 }
 
-function detectType(text: string): "daily" | "weekly" | "unknown" {
+function detectType(text: string): "daily" | "weekly" | "bingo" {
   const lower = text.toLowerCase();
 
+  const bingoKeywords = ["bingo", "bucket list", "crossed off", "checked off", "completed"];
+  if (bingoKeywords.some((kw) => lower.includes(kw))) return "bingo";
+
   const weeklyKeywords = [
-    "yoga",
-    "pilates",
-    "weightlift",
-    "lifted",
-    "gym",
-    "this week",
-    "weekly",
+    "yoga", "pilates", "weightlift", "lifted", "gym", "this week", "weekly",
   ];
   if (weeklyKeywords.some((kw) => lower.includes(kw))) return "weekly";
 
@@ -94,14 +91,29 @@ export async function POST(request: Request) {
 
     if (text === "/start") {
       await sendMessage(
-        "Hey! I'm your goal journal bot. I'll send you daily and weekly check-ins. Just reply naturally when I ask how your day went!"
+        "Hey! I'm your goal journal bot. I'll send you daily and weekly check-ins. Just reply naturally when I ask how your day went!\n\nYou can also tell me about bingo items you've completed, like:\n\"bingo: I had a phone free day\""
       );
       return NextResponse.json({ ok: true });
     }
 
     const type = detectType(text);
 
-    if (type === "daily") {
+    if (type === "bingo") {
+      const bingoItems = await getBingoItems();
+      const matched = await parseBingoReply(text, bingoItems);
+
+      if (matched.length === 0) {
+        await sendMessage("I couldn't match that to any bingo items. Try something like:\n\"bingo: I had a phone free day\"");
+      } else {
+        for (const item of matched) {
+          await updateBingoItem(item.id, true);
+        }
+        const completedItems = await getBingoItems();
+        const total = completedItems.filter((i) => i.completed).length;
+        const names = matched.map((i) => `✅ ${i.title}`).join("\n");
+        await sendMessage(`Bingo updated! ${total}/25 complete:\n\n${names}`);
+      }
+    } else if (type === "daily") {
       const parsed = await parseDailyReply(text);
       await upsertDailyLog(todayStr(), parsed);
       await sendMessage(formatDailyConfirmation(parsed));
