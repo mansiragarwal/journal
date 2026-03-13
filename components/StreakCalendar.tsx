@@ -69,6 +69,19 @@ export function StreakCalendar() {
     return "bg-emerald-500";
   }
 
+  function buildTooltip(day: Date, log: DailyLog | undefined): string {
+    if (!log) return format(day, "MMM d");
+    const items = [
+      log.walking_10k && "10k walking",
+      log.walking_after_meals && "Walk after meals",
+      log.pushups > 0 && `Pushups (${log.pushups})`,
+      log.plank && (log.plank_time ? `Plank (${log.plank_time}s)` : "Plank"),
+      log.brainstorming && "Brainstorming",
+    ].filter(Boolean);
+    if (items.length === 0) return `${format(day, "MMM d")} — no goals`;
+    return `${format(day, "MMM d")}:\n${items.join("\n")}`;
+  }
+
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
@@ -124,11 +137,7 @@ export function StreakCalendar() {
                     ? `ring-2 ring-emerald-500 ${rateToColor(rate)} text-gray-700`
                     : `${rateToColor(rate)} text-gray-700`
               }`}
-              title={
-                future
-                  ? ""
-                  : `${format(day, "MMM d")}: ${Math.round(rate * 100)}% complete`
-              }
+              title={future ? "" : buildTooltip(day, log)}
             >
               {format(day, "d")}
             </div>
