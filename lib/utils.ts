@@ -4,12 +4,19 @@ import {
   differenceInCalendarDays,
   subDays,
 } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 
-export function todayStr() {
-  return format(new Date(), "yyyy-MM-dd");
+const TZ = "America/New_York";
+
+function nowET() {
+  return new TZDate(new Date(), TZ);
 }
 
-export function weekStartStr(date: Date = new Date()) {
+export function todayStr() {
+  return format(nowET(), "yyyy-MM-dd");
+}
+
+export function weekStartStr(date: Date = nowET()) {
   return format(startOfWeek(date, { weekStartsOn: 1 }), "yyyy-MM-dd");
 }
 
