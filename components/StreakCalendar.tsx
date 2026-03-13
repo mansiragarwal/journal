@@ -17,10 +17,43 @@ import { dailyCompletionRate } from "@/lib/utils";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
+function GoalTooltip({ log, day }: { log: DailyLog | undefined; day: Date }) {
+  const items = log
+    ? [
+        { done: log.walking_10k, label: "10k walking" },
+        { done: log.walking_after_meals, label: "Walk after meals" },
+        { done: log.pushups > 0, label: `Pushups${log.pushups > 0 ? ` (${log.pushups})` : ""}` },
+        { done: log.plank, label: `Plank${log.plank_time ? ` (${log.plank_time}s)` : ""}` },
+        { done: log.brainstorming, label: "Brainstorming" },
+      ]
+    : [];
+
+  const hasAny = items.some((i) => i.done);
+
+  return (
+    <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-3 py-2 text-left text-xs text-white shadow-lg whitespace-nowrap">
+      <p className="mb-1 font-semibold">{format(day, "MMM d")}</p>
+      {!hasAny ? (
+        <p className="text-gray-400">No goals logged</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {items.map((item) => (
+            <li key={item.label} className={item.done ? "text-emerald-300" : "text-gray-500"}>
+              {item.done ? "✓" : "·"} {item.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+    </div>
+  );
+}
+
 export function StreakCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [logs, setLogs] = useState<DailyLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
   const mountedRef = useRef(false);
 
   const fetchLogs = useCallback((date: Date) => {
@@ -69,19 +102,6 @@ export function StreakCalendar() {
     return "bg-emerald-500";
   }
 
-  function buildTooltip(day: Date, log: DailyLog | undefined): string {
-    if (!log) return format(day, "MMM d");
-    const items = [
-      log.walking_10k && "10k walking",
-      log.walking_after_meals && "Walk after meals",
-      log.pushups > 0 && `Pushups (${log.pushups})`,
-      log.plank && (log.plank_time ? `Plank (${log.plank_time}s)` : "Plank"),
-      log.brainstorming && "Brainstorming",
-    ].filter(Boolean);
-    if (items.length === 0) return `${format(day, "MMM d")} — no goals`;
-    return `${format(day, "MMM d")}:\n${items.join("\n")}`;
-  }
-
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <div className="mb-4 flex items-center justify-between">
@@ -126,20 +146,27 @@ export function StreakCalendar() {
           const rate = log ? dailyCompletionRate(log) : 0;
           const future = isFuture(day);
           const today = isToday(day);
+          const isHovered = hoveredDate === dateStr;
 
           return (
             <div
               key={dateStr}
-              className={`flex aspect-square items-center justify-center rounded-lg text-xs font-medium transition-colors ${
-                future
-                  ? "text-gray-300"
-                  : today
-                    ? `ring-2 ring-emerald-500 ${rateToColor(rate)} text-gray-700`
-                    : `${rateToColor(rate)} text-gray-700`
-              }`}
-              title={future ? "" : buildTooltip(day, log)}
+              className="relative"
+              onMouseEnter={() => !future && setHoveredDate(dateStr)}
+              onMouseLeave={() => setHoveredDate(null)}
             >
-              {format(day, "d")}
+              <div
+                className={`flex aspect-square cursor-default items-center justify-center rounded-lg text-xs font-medium transition-colors ${
+                  future
+                    ? "text-gray-300"
+                    : today
+                      ? `ring-2 ring-emerald-500 ${rateToColor(rate)} text-gray-700`
+                      : `${rateToColor(rate)} text-gray-700`
+                }`}
+              >
+                {format(day, "d")}
+              </div>
+              {isHovered && <GoalTooltip log={log} day={day} />}
             </div>
           );
         })}
