@@ -75,17 +75,12 @@ export function BingoBoard({ items: initialItems }: Props) {
               key={item.id}
               onClick={() => toggleItem(item.id, item.completed)}
               disabled={isPending}
-              className={`relative flex aspect-square items-center justify-center rounded-xl border-2 p-2 text-center text-xs leading-tight transition-all ${
+              className={`flex aspect-square items-center justify-center rounded-xl border-2 p-2 text-center text-xs leading-tight transition-all ${
                 item.completed
-                  ? "border-pink-400 bg-pink-50 font-semibold text-pink-700"
+                  ? "border-pink-300 bg-pink-200 font-semibold text-pink-800"
                   : "border-gray-200 bg-gray-50 text-gray-600 hover:border-pink-300 hover:bg-pink-50"
               } ${celebrateId === item.id ? "scale-110" : ""}`}
             >
-              {item.completed && (
-                <span className="absolute -right-1 -top-1 text-base">
-                  &#10003;
-                </span>
-              )}
               <span className="line-clamp-3">{item.title}</span>
             </button>
           ))

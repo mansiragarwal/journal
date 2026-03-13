@@ -40,6 +40,21 @@ export interface BingoItem {
   completed_at: string | null;
 }
 
+export interface BodyStat {
+  id: number;
+  category: string;
+  name: string;
+  value: number;
+  unit: string;
+  recorded_at: string;
+}
+
+export interface Idea {
+  id: number;
+  text: string;
+  created_at: string;
+}
+
 export function dailyCompletionRate(log: DailyLog): number {
   const goals = [
     log.walking_10k,

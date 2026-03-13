@@ -99,6 +99,43 @@ export async function parseWeeklyReply(
   };
 }
 
+export interface ParsedStat {
+  category: string;
+  name: string;
+  value: number;
+  unit: string;
+}
+
+export async function parseStatsReply(text: string): Promise<ParsedStat[]> {
+  const message = await anthropic.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 300,
+    system: `You parse natural language messages about body stats into JSON.
+
+There are 3 categories:
+- "weight" — body weight (e.g. "I weigh 145 lbs", "weight: 65 kg")
+- "exercise" — weight lifted for exercises (e.g. "bench: 95 lbs", "I can squat 135", "deadlift 225 lbs")
+- "measurement" — body measurements (e.g. "waist: 28 inches", "my hips are 36 in", "bicep 13 inches")
+
+Rules:
+- Normalize exercise names to lowercase (e.g. "bench press", "squat", "deadlift", "hip thrust")
+- For body weight, name should be "weight"
+- Default unit to "lbs" for weight/exercise, "inches" for measurements
+- If they specify kg or cm, use those units
+- A single message can contain multiple stats
+
+Respond with ONLY valid JSON array, no markdown, no explanation:
+[{"category":"...","name":"...","value":number,"unit":"..."}]`,
+    messages: [{ role: "user", content: text }],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") return [];
+
+  const parsed = JSON.parse(extractJSON(content.text));
+  return Array.isArray(parsed) ? parsed : [];
+}
+
 export async function parseBingoReply(
   text: string,
   items: BingoItem[]

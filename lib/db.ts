@@ -1,5 +1,5 @@
 import { sql } from "@vercel/postgres";
-import type { DailyLog, WeeklyLog, BingoItem } from "./utils";
+import type { DailyLog, WeeklyLog, BingoItem, BodyStat, Idea } from "./utils";
 
 export async function getTodayLog(date: string): Promise<DailyLog | null> {
   const { rows } = await sql`
@@ -102,4 +102,57 @@ export async function getRecentDailyLogs(limit: number = 30): Promise<DailyLog[]
     SELECT * FROM daily_logs ORDER BY date DESC LIMIT ${limit}
   `;
   return rows as DailyLog[];
+}
+
+// --- Body Stats ---
+
+export async function addBodyStat(
+  category: string,
+  name: string,
+  value: number,
+  unit: string = "lbs"
+) {
+  await sql`
+    INSERT INTO body_stats (category, name, value, unit)
+    VALUES (${category}, ${name}, ${value}, ${unit})
+  `;
+}
+
+export async function getLatestStats(): Promise<BodyStat[]> {
+  const { rows } = await sql`
+    SELECT DISTINCT ON (name) *
+    FROM body_stats
+    ORDER BY name, recorded_at DESC
+  `;
+  return rows as BodyStat[];
+}
+
+export async function getStatHistory(
+  name: string,
+  limit: number = 30
+): Promise<BodyStat[]> {
+  const { rows } = await sql`
+    SELECT * FROM body_stats
+    WHERE name = ${name}
+    ORDER BY recorded_at DESC
+    LIMIT ${limit}
+  `;
+  return rows as BodyStat[];
+}
+
+// --- Ideas ---
+
+export async function addIdea(text: string) {
+  await sql`INSERT INTO ideas (text) VALUES (${text})`;
+}
+
+export async function getIdeas(limit: number = 50): Promise<Idea[]> {
+  const { rows } = await sql`
+    SELECT * FROM ideas ORDER BY created_at DESC LIMIT ${limit}
+  `;
+  return rows as Idea[];
+}
+
+export async function deleteIdea(id: number) {
+  await sql`DELETE FROM ideas WHERE id = ${id}`;
 }

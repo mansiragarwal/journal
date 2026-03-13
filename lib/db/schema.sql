@@ -30,6 +30,21 @@ CREATE TABLE bingo_items (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE body_stats (
+  id SERIAL PRIMARY KEY,
+  category TEXT NOT NULL,
+  name TEXT NOT NULL,
+  value NUMERIC NOT NULL,
+  unit TEXT DEFAULT 'lbs',
+  recorded_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE ideas (
+  id SERIAL PRIMARY KEY,
+  text TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
 INSERT INTO bingo_items (position, title) VALUES
 (0, 'I got a tattoo'),
 (1, 'I went on a solo trip'),
