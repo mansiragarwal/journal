@@ -114,8 +114,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("Telegram webhook error:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
     try {
-      await sendMessage("Hmm, I couldn't understand that. Try again?");
+      await sendMessage(`Something went wrong: ${errMsg}`);
     } catch {
       // ignore send failure
     }
