@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { ViewToggle } from "./ViewToggle";
 import { StreakCalendar } from "./StreakCalendar";
 import { BingoBoard } from "./BingoBoard";
@@ -12,9 +13,10 @@ import type { BingoItem } from "@/lib/utils";
 interface Props {
   streak: number;
   bingoItems: BingoItem[];
+  userName?: string | null;
 }
 
-export function Dashboard({ streak, bingoItems }: Props) {
+export function Dashboard({ streak, bingoItems, userName }: Props) {
   const [view, setView] = useState<"calendar" | "bingo">("calendar");
 
   return (
@@ -30,12 +32,29 @@ export function Dashboard({ streak, bingoItems }: Props) {
             </span>
           )}
         </div>
-        <Link
-          href="/edit"
-          className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
-        >
-          Edit
-        </Link>
+        <div className="flex items-center gap-2">
+          {userName && (
+            <span className="hidden sm:inline text-sm text-gray-500">{userName}</span>
+          )}
+          <Link
+            href="/edit"
+            className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            Edit
+          </Link>
+          <Link
+            href="/settings"
+            className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            Settings
+          </Link>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="rounded-xl bg-gray-100 px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_260px]">
