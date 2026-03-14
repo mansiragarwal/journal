@@ -15,12 +15,17 @@ export interface ParsedGoalUpdate {
   value: number | null;
 }
 
+export interface GoalReplyResult {
+  updates: ParsedGoalUpdate[];
+  date_offset: number | null;
+}
+
 export async function parseGoalReply(
   text: string,
   goals: GoalDefinition[],
   frequency: string
-): Promise<ParsedGoalUpdate[]> {
-  if (goals.length === 0) return [];
+): Promise<GoalReplyResult> {
+  if (goals.length === 0) return { updates: [], date_offset: null };
 
   const goalList = goals
     .map((g) => {
@@ -33,7 +38,7 @@ export async function parseGoalReply(
 
   const message = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 300,
+    max_tokens: 400,
     system: `You parse natural language messages about ${frequency} goal completion into JSON.
 
 The user's ${frequency} goals are:
@@ -47,17 +52,24 @@ Rules:
 - For measurable goals, extract the numeric value if mentioned
 - For habits, set completed: true/false
 - Only include goals that match the ${frequency} frequency
+- If they mention a past date like "yesterday", "2 days ago", "on Monday", "March 10", extract date_offset as negative days from today (e.g. yesterday = -1, 2 days ago = -2). If no date mentioned, date_offset is null.
 
-Respond with ONLY valid JSON array, no markdown:
-[{"goal_id": number, "completed": boolean, "value": number|null}]`,
+Respond with ONLY valid JSON, no markdown:
+{"updates": [{"goal_id": number, "completed": boolean, "value": number|null}], "date_offset": number|null}`,
     messages: [{ role: "user", content: text }],
   });
 
   const content = message.content[0];
-  if (content.type !== "text") return [];
+  if (content.type !== "text") return { updates: [], date_offset: null };
 
   const parsed = JSON.parse(extractJSON(content.text));
-  return Array.isArray(parsed) ? parsed : [];
+  if (Array.isArray(parsed)) {
+    return { updates: parsed, date_offset: null };
+  }
+  return {
+    updates: Array.isArray(parsed.updates) ? parsed.updates : [],
+    date_offset: typeof parsed.date_offset === "number" ? parsed.date_offset : null,
+  };
 }
 
 export interface ParsedStat {

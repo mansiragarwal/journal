@@ -9,8 +9,6 @@ import {
   getDay,
   subMonths,
   addMonths,
-  isToday,
-  isFuture,
 } from "date-fns";
 import type { GoalWithLog } from "@/lib/utils";
 
@@ -21,8 +19,15 @@ interface DayEntry {
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function StreakCalendar() {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+interface Props {
+  todayDate?: string;
+}
+
+export function StreakCalendar({ todayDate }: Props) {
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    if (todayDate) return new Date(todayDate + "T12:00:00");
+    return new Date();
+  });
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
@@ -135,8 +140,9 @@ export function StreakCalendar() {
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const rate = entryMap.get(dateStr) ?? 0;
-          const future = isFuture(day);
-          const today = isToday(day);
+          const todayStr = todayDate || format(new Date(), "yyyy-MM-dd");
+          const future = dateStr > todayStr;
+          const today = dateStr === todayStr;
           const isHovered = hoveredDate === dateStr;
 
           return (

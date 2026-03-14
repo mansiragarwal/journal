@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getBingoItems, getDailyCompletionHistory, isOnboardingComplete } from "@/lib/db";
-import { calculateStreak } from "@/lib/utils";
+import { calculateStreak, todayStr } from "@/lib/utils";
 import { Dashboard } from "@/components/Dashboard";
 import { format, subDays } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 
 export const dynamic = "force-dynamic";
 
@@ -16,8 +17,9 @@ export default async function Home() {
   const onboarded = await isOnboardingComplete(userId);
   if (!onboarded) redirect("/onboarding");
 
-  const endDate = format(new Date(), "yyyy-MM-dd");
-  const startDate = format(subDays(new Date(), 30), "yyyy-MM-dd");
+  const now = new TZDate(new Date(), "America/New_York");
+  const endDate = todayStr();
+  const startDate = format(subDays(now, 30), "yyyy-MM-dd");
 
   const [bingoItems, dailyHistory] = await Promise.all([
     getBingoItems(userId),
@@ -32,6 +34,7 @@ export default async function Home() {
         streak={streak}
         bingoItems={bingoItems}
         userName={session.user.name}
+        todayDate={endDate}
       />
     </main>
   );

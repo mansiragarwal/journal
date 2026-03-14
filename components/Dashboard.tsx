@@ -14,9 +14,10 @@ interface Props {
   streak: number;
   bingoItems: BingoItem[];
   userName?: string | null;
+  todayDate?: string;
 }
 
-export function Dashboard({ streak, bingoItems, userName }: Props) {
+export function Dashboard({ streak, bingoItems, userName, todayDate }: Props) {
   const [view, setView] = useState<"calendar" | "bingo">("calendar");
 
   return (
@@ -65,7 +66,7 @@ export function Dashboard({ streak, bingoItems, userName }: Props) {
 
           <div className="min-h-[400px]">
             {view === "calendar" ? (
-              <StreakCalendar />
+              <StreakCalendar todayDate={todayDate} />
             ) : (
               <BingoBoard items={bingoItems} />
             )}

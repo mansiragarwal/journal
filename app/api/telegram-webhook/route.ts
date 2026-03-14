@@ -14,6 +14,8 @@ import {
   getIdeas,
 } from "@/lib/db";
 import { periodDateFor } from "@/lib/utils";
+import { subDays, format } from "date-fns";
+import { TZDate } from "@date-fns/tz";
 
 interface TelegramUpdate {
   message?: {
@@ -170,19 +172,30 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      const parsed = await parseGoalReply(text, goals, frequency);
-      const pDate = periodDateFor(frequency);
+      const result = await parseGoalReply(text, goals, frequency);
+      const { updates, date_offset } = result;
 
-      for (const update of parsed) {
+      let pDate: string;
+      let dateLabel: string;
+      if (date_offset != null && date_offset < 0) {
+        const targetDate = subDays(new TZDate(new Date(), "America/New_York"), Math.abs(date_offset));
+        pDate = format(targetDate, "yyyy-MM-dd");
+        dateLabel = format(targetDate, "MMM d");
+      } else {
+        pDate = periodDateFor(frequency);
+        dateLabel = frequency === "daily" ? "today" : "this week";
+      }
+
+      for (const update of updates) {
         await upsertGoalLog(userId, update.goal_id, pDate, {
           completed: update.completed,
           value: update.value,
         });
       }
 
-      const done = parsed.filter((p) => p.completed).length;
+      const done = updates.filter((p) => p.completed).length;
       const items = goals.map((g) => {
-        const upd = parsed.find((p) => p.goal_id === g.id);
+        const upd = updates.find((p) => p.goal_id === g.id);
         const check = upd?.completed ? "✅" : "⬜";
         const extra = g.tracking_type === "number" && upd?.value != null ? ` (${upd.value})` : "";
         return `${check} ${g.name}${extra}`;
@@ -190,7 +203,7 @@ export async function POST(request: Request) {
 
       await sendMessage(
         chatId,
-        `Got it! ${done}/${goals.length} ${frequency === "daily" ? "today" : "this week"}:\n\n${items.join("\n")}`
+        `Got it! ${done}/${goals.length} for ${dateLabel}:\n\n${items.join("\n")}`
       );
     }
 
