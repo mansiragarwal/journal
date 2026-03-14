@@ -55,32 +55,33 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: { strategy: "jwt" },
   callbacks: {
     async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-      }
       if (account?.provider === "google" && user?.email) {
-        const { rows } = await sql`SELECT id, onboarding_complete FROM users WHERE email = ${user.email}`;
-        if (rows.length === 0) {
-          const { rows: newRows } = await sql`
-            INSERT INTO users (name, email, image, email_verified)
-            VALUES (${user.name}, ${user.email}, ${user.image}, NOW())
-            RETURNING id, onboarding_complete
-          `;
-          token.id = newRows[0].id;
-          token.onboardingComplete = false;
-
-          await sql`
-            INSERT INTO accounts (user_id, type, provider, provider_account_id, access_token, refresh_token, expires_at, token_type, scope, id_token)
-            VALUES (${newRows[0].id}, ${account.type}, ${account.provider}, ${account.providerAccountId}, ${account.access_token ?? null}, ${account.refresh_token ?? null}, ${account.expires_at ?? null}, ${account.token_type ?? null}, ${account.scope ?? null}, ${account.id_token ?? null})
-          `;
-        } else {
-          token.id = rows[0].id;
-          token.onboardingComplete = rows[0].onboarding_complete;
+        try {
+          const { rows } = await sql`SELECT id, onboarding_complete FROM users WHERE email = ${user.email}`;
+          if (rows.length === 0) {
+            const { rows: newRows } = await sql`
+              INSERT INTO users (name, email, image, email_verified)
+              VALUES (${user.name ?? null}, ${user.email}, ${user.image ?? null}, NOW())
+              RETURNING id, onboarding_complete
+            `;
+            token.id = newRows[0].id;
+            token.onboardingComplete = false;
+          } else {
+            token.id = rows[0].id;
+            token.onboardingComplete = rows[0].onboarding_complete;
+          }
+        } catch (err) {
+          console.error("Google sign-in DB error:", err);
+          throw err;
         }
-      }
-      if (user && !account) {
-        const { rows } = await sql`SELECT onboarding_complete FROM users WHERE id = ${token.id as string}`;
-        token.onboardingComplete = rows[0]?.onboarding_complete ?? false;
+      } else if (user) {
+        token.id = user.id;
+        try {
+          const { rows } = await sql`SELECT onboarding_complete FROM users WHERE id = ${user.id}`;
+          token.onboardingComplete = rows[0]?.onboarding_complete ?? false;
+        } catch {
+          token.onboardingComplete = false;
+        }
       }
       return token;
     },
