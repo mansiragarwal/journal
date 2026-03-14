@@ -172,39 +172,43 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      const result = await parseGoalReply(text, goals, frequency);
-      const { updates, date_offset } = result;
+      const now = new TZDate(new Date(), "America/New_York");
+      const todayDateStr = format(now, "yyyy-MM-dd");
+      const dateGroups = await parseGoalReply(text, goals, frequency, todayDateStr);
 
-      let pDate: string;
-      let dateLabel: string;
-      if (date_offset != null && date_offset < 0) {
-        const targetDate = subDays(new TZDate(new Date(), "America/New_York"), Math.abs(date_offset));
-        pDate = format(targetDate, "yyyy-MM-dd");
-        dateLabel = format(targetDate, "MMM d");
-      } else {
-        pDate = periodDateFor(frequency);
-        dateLabel = frequency === "daily" ? "today" : "this week";
-      }
+      const confirmations: string[] = [];
 
-      for (const update of updates) {
-        await upsertGoalLog(userId, update.goal_id, pDate, {
-          completed: update.completed,
-          value: update.value,
+      for (const group of dateGroups) {
+        let pDate: string;
+        let dateLabel: string;
+        if (group.date_offset != null && group.date_offset < 0) {
+          const targetDate = subDays(now, Math.abs(group.date_offset));
+          pDate = format(targetDate, "yyyy-MM-dd");
+          dateLabel = format(targetDate, "MMM d");
+        } else {
+          pDate = periodDateFor(frequency);
+          dateLabel = frequency === "daily" ? "today" : "this week";
+        }
+
+        for (const update of group.updates) {
+          await upsertGoalLog(userId, update.goal_id, pDate, {
+            completed: update.completed,
+            value: update.value,
+          });
+        }
+
+        const done = group.updates.filter((p) => p.completed).length;
+        const items = goals.map((g) => {
+          const upd = group.updates.find((p) => p.goal_id === g.id);
+          const check = upd?.completed ? "✅" : "⬜";
+          const extra = g.tracking_type === "number" && upd?.value != null ? ` (${upd.value})` : "";
+          return `${check} ${g.name}${extra}`;
         });
+
+        confirmations.push(`${dateLabel}: ${done}/${goals.length}\n${items.join("\n")}`);
       }
 
-      const done = updates.filter((p) => p.completed).length;
-      const items = goals.map((g) => {
-        const upd = updates.find((p) => p.goal_id === g.id);
-        const check = upd?.completed ? "✅" : "⬜";
-        const extra = g.tracking_type === "number" && upd?.value != null ? ` (${upd.value})` : "";
-        return `${check} ${g.name}${extra}`;
-      });
-
-      await sendMessage(
-        chatId,
-        `Got it! ${done}/${goals.length} for ${dateLabel}:\n\n${items.join("\n")}`
-      );
+      await sendMessage(chatId, `Got it!\n\n${confirmations.join("\n\n")}`);
     }
 
     return NextResponse.json({ ok: true });

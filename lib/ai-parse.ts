@@ -15,17 +15,18 @@ export interface ParsedGoalUpdate {
   value: number | null;
 }
 
-export interface GoalReplyResult {
-  updates: ParsedGoalUpdate[];
+export interface DateGroup {
   date_offset: number | null;
+  updates: ParsedGoalUpdate[];
 }
 
 export async function parseGoalReply(
   text: string,
   goals: GoalDefinition[],
-  frequency: string
-): Promise<GoalReplyResult> {
-  if (goals.length === 0) return { updates: [], date_offset: null };
+  frequency: string,
+  todayDate: string
+): Promise<DateGroup[]> {
+  if (goals.length === 0) return [];
 
   const goalList = goals
     .map((g) => {
@@ -38,8 +39,9 @@ export async function parseGoalReply(
 
   const message = await anthropic.messages.create({
     model: "claude-haiku-4-5-20251001",
-    max_tokens: 400,
+    max_tokens: 800,
     system: `You parse natural language messages about ${frequency} goal completion into JSON.
+Today's date is ${todayDate}.
 
 The user's ${frequency} goals are:
 ${goalList}
@@ -51,25 +53,29 @@ Rules:
 - If they say "everything except X" -> all except those completed
 - For measurable goals, extract the numeric value if mentioned
 - For habits, set completed: true/false
-- Only include goals that match the ${frequency} frequency
-- If they mention a past date like "yesterday", "2 days ago", "on Monday", "March 10", extract date_offset as negative days from today (e.g. yesterday = -1, 2 days ago = -2). If no date mentioned, date_offset is null.
+- The message may contain MULTIPLE dates/entries (e.g. separate lines for different days). Parse EACH date separately.
+- For date references like "yesterday", "3/12", "March 10", "Monday", "2 days ago" — compute date_offset as negative days from today. E.g. if today is 3/13 and they say 3/12, date_offset = -1. If today is 3/13 and they say 3/9, date_offset = -4. If no date is mentioned, date_offset = null (means today).
 
-Respond with ONLY valid JSON, no markdown:
-{"updates": [{"goal_id": number, "completed": boolean, "value": number|null}], "date_offset": number|null}`,
+Respond with ONLY valid JSON array, no markdown. Each entry has a date_offset and the goal updates for that date:
+[{"date_offset": number|null, "updates": [{"goal_id": number, "completed": boolean, "value": number|null}]}]`,
     messages: [{ role: "user", content: text }],
   });
 
   const content = message.content[0];
-  if (content.type !== "text") return { updates: [], date_offset: null };
+  if (content.type !== "text") return [];
 
   const parsed = JSON.parse(extractJSON(content.text));
+
   if (Array.isArray(parsed)) {
-    return { updates: parsed, date_offset: null };
+    if (parsed.length > 0 && parsed[0].updates) {
+      return parsed as DateGroup[];
+    }
+    return [{ date_offset: null, updates: parsed as ParsedGoalUpdate[] }];
   }
-  return {
-    updates: Array.isArray(parsed.updates) ? parsed.updates : [],
-    date_offset: typeof parsed.date_offset === "number" ? parsed.date_offset : null,
-  };
+  if (parsed.updates) {
+    return [parsed as DateGroup];
+  }
+  return [];
 }
 
 export interface ParsedStat {
