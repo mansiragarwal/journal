@@ -180,10 +180,17 @@ export async function getDailyCompletionHistory(
   startDate: string,
   endDate: string
 ): Promise<{ date: string; rate: number }[]> {
+  const { rows: totalRow } = await sql`
+    SELECT COUNT(*) as total FROM goal_definitions
+    WHERE user_id = ${userId} AND frequency = 'daily' AND active = true
+  `;
+  const totalGoals = Number(totalRow[0]?.total) || 0;
+  if (totalGoals === 0) return [];
+
   const { rows } = await sql`
     SELECT
       gl.period_date::text as date,
-      COUNT(CASE WHEN gl.completed THEN 1 END)::float / NULLIF(COUNT(*)::float, 0) as rate
+      COUNT(CASE WHEN gl.completed THEN 1 END)::float as done
     FROM goal_logs gl
     JOIN goal_definitions gd ON gl.goal_id = gd.id
     WHERE gl.user_id = ${userId}
@@ -194,7 +201,10 @@ export async function getDailyCompletionHistory(
     GROUP BY gl.period_date
     ORDER BY gl.period_date
   `;
-  return rows.map((r) => ({ date: r.date, rate: Number(r.rate) || 0 }));
+  return rows.map((r) => ({
+    date: r.date,
+    rate: Math.min(1, Number(r.done) / totalGoals),
+  }));
 }
 
 // ─── Bingo Items ─────────────────────────────────────────────────────

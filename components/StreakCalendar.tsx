@@ -12,6 +12,7 @@ import {
   isToday,
   isFuture,
 } from "date-fns";
+import type { GoalWithLog } from "@/lib/utils";
 
 interface DayEntry {
   date: string;
@@ -25,13 +26,16 @@ export function StreakCalendar() {
   const [entries, setEntries] = useState<DayEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+  const [tooltipGoals, setTooltipGoals] = useState<GoalWithLog[]>([]);
+  const [tooltipLoading, setTooltipLoading] = useState(false);
   const mountedRef = useRef(false);
+  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchData = useCallback((date: Date) => {
-    const monthStart = startOfMonth(date);
-    const monthEnd = endOfMonth(date);
-    const startStr = format(monthStart, "yyyy-MM-dd");
-    const endDate = new Date(monthEnd);
+    const ms = startOfMonth(date);
+    const me = endOfMonth(date);
+    const startStr = format(ms, "yyyy-MM-dd");
+    const endDate = new Date(me);
     endDate.setDate(endDate.getDate() + 1);
     const endStr = format(endDate, "yyyy-MM-dd");
 
@@ -55,6 +59,27 @@ export function StreakCalendar() {
     setLoading(true);
     setCurrentMonth(next);
     fetchData(next);
+  }
+
+  function handleHover(dateStr: string) {
+    setHoveredDate(dateStr);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+    hoverTimerRef.current = setTimeout(() => {
+      setTooltipLoading(true);
+      fetch(`/api/goals/log?frequency=daily&period_date=${dateStr}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setTooltipGoals(data);
+          setTooltipLoading(false);
+        })
+        .catch(() => setTooltipLoading(false));
+    }, 150);
+  }
+
+  function handleLeave() {
+    setHoveredDate(null);
+    setTooltipGoals([]);
+    if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
   }
 
   const monthStart = startOfMonth(currentMonth);
@@ -118,8 +143,8 @@ export function StreakCalendar() {
             <div
               key={dateStr}
               className="relative"
-              onMouseEnter={() => !future && setHoveredDate(dateStr)}
-              onMouseLeave={() => setHoveredDate(null)}
+              onMouseEnter={() => !future && handleHover(dateStr)}
+              onMouseLeave={handleLeave}
             >
               <div
                 className={`flex aspect-square cursor-default items-center justify-center rounded-lg text-xs font-medium transition-colors ${
@@ -132,10 +157,29 @@ export function StreakCalendar() {
               >
                 {format(day, "d")}
               </div>
-              {isHovered && rate > 0 && (
-                <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-3 py-2 text-xs text-white shadow-lg whitespace-nowrap">
-                  <p className="font-semibold">{format(day, "MMM d")}</p>
-                  <p className="text-emerald-300">{Math.round(rate * 100)}% complete</p>
+              {isHovered && !future && (
+                <div className="absolute -top-2 left-1/2 z-50 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 px-3 py-2 text-left text-xs text-white shadow-lg whitespace-nowrap">
+                  <p className="mb-1 font-semibold">{format(day, "MMM d")}</p>
+                  {tooltipLoading ? (
+                    <p className="text-gray-400">Loading...</p>
+                  ) : tooltipGoals.length === 0 ? (
+                    <p className="text-gray-400">No goals logged</p>
+                  ) : (
+                    <ul className="space-y-0.5">
+                      {tooltipGoals.map((g) => {
+                        const done = g.log?.completed;
+                        const valueStr =
+                          g.tracking_type === "number" && g.log?.value != null
+                            ? ` (${g.log.value}${g.target_value ? `/${g.target_value}` : ""} ${g.unit || ""})`
+                            : "";
+                        return (
+                          <li key={g.id} className={done ? "text-emerald-300" : "text-gray-500"}>
+                            {done ? "✓" : "·"} {g.name}{valueStr}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                   <div className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
                 </div>
               )}
