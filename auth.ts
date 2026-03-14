@@ -49,8 +49,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  debug: true,
   pages: {
     signIn: "/login",
+    error: "/login",
   },
   session: { strategy: "jwt" },
   callbacks: {
