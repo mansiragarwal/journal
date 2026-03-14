@@ -238,11 +238,11 @@ export async function createBingoItems(
   userId: string,
   items: { position: number; title: string }[]
 ) {
+  await sql`DELETE FROM bingo_items WHERE user_id = ${userId}`;
   for (const item of items) {
     await sql`
       INSERT INTO bingo_items (user_id, position, title)
       VALUES (${userId}, ${item.position}, ${item.title})
-      ON CONFLICT (user_id, position) DO UPDATE SET title = ${item.title}
     `;
   }
 }

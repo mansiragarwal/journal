@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import type { GoalDefinition } from "@/lib/utils";
+import type { GoalDefinition, BingoItem } from "@/lib/utils";
 
 const FREQUENCIES = ["daily", "weekly", "monthly", "quarterly"] as const;
 
@@ -34,14 +34,29 @@ export default function SettingsPage() {
   const [isPending, startTransition] = useTransition();
   const [telegramLinked, setTelegramLinked] = useState(false);
   const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [bingoItems, setBingoItems] = useState<BingoItem[]>([]);
+  const [bingoEditing, setBingoEditing] = useState(false);
+  const [bingoDrafts, setBingoDrafts] = useState<string[]>(Array(25).fill(""));
+  const [bingoSaved, setBingoSaved] = useState(false);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/goals?all=true").then((r) => r.json()),
       fetch("/api/telegram/link").then((r) => r.json()),
-    ]).then(([goalsData, telegramData]) => {
+      fetch("/api/bingo").then((r) => r.json()),
+    ]).then(([goalsData, telegramData, bingoData]) => {
       if (Array.isArray(goalsData)) setGoals(goalsData);
       setTelegramLinked(telegramData.linked ?? false);
+      if (Array.isArray(bingoData)) {
+        setBingoItems(bingoData);
+        const drafts = Array(25).fill("");
+        bingoData.forEach((item: BingoItem) => {
+          if (item.position >= 0 && item.position < 25) {
+            drafts[item.position] = item.title;
+          }
+        });
+        setBingoDrafts(drafts);
+      }
       setLoading(false);
     });
   }, []);
@@ -295,6 +310,117 @@ export default function SettingsPage() {
             </section>
           );
         })}
+
+        {/* Bingo Board */}
+        <section>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Bingo Board</h2>
+            {bingoItems.length > 0 && !bingoEditing && (
+              <button
+                onClick={() => setBingoEditing(true)}
+                className="rounded-lg bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-200"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          {bingoItems.length === 0 && !bingoEditing ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <p className="text-sm text-gray-500">
+                No bingo board yet. Create a 5x5 board with 25 goals or fun items to check off.
+              </p>
+              <button
+                onClick={() => setBingoEditing(true)}
+                className="mt-3 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+              >
+                Create Bingo Board
+              </button>
+            </div>
+          ) : bingoEditing ? (
+            <div className="rounded-2xl border border-gray-200 bg-white p-5">
+              <p className="mb-3 text-sm text-gray-500">
+                Fill in 25 items for your bingo board. Leave blank to skip a slot.
+              </p>
+              <div className="grid grid-cols-5 gap-2">
+                {bingoDrafts.map((title, i) => (
+                  <input
+                    key={i}
+                    type="text"
+                    value={title}
+                    onChange={(e) => {
+                      const next = [...bingoDrafts];
+                      next[i] = e.target.value;
+                      setBingoDrafts(next);
+                      setBingoSaved(false);
+                    }}
+                    placeholder={`${i + 1}`}
+                    className="rounded-lg border border-gray-300 px-2 py-2 text-center text-xs placeholder:text-gray-300 focus:border-pink-400 focus:outline-none"
+                  />
+                ))}
+              </div>
+              <div className="mt-4 flex gap-2">
+                <button
+                  onClick={() => {
+                    startTransition(async () => {
+                      const items = bingoDrafts
+                        .map((title, position) => ({ position, title: title.trim() }))
+                        .filter((item) => item.title !== "");
+                      const res = await fetch("/api/bingo", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ items }),
+                      });
+                      const data = await res.json();
+                      if (Array.isArray(data)) setBingoItems(data);
+                      setBingoSaved(true);
+                      setBingoEditing(false);
+                    });
+                  }}
+                  disabled={isPending || bingoDrafts.every((d) => !d.trim())}
+                  className="flex-1 rounded-xl bg-pink-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-pink-700 disabled:opacity-50"
+                >
+                  {isPending ? "Saving..." : bingoSaved ? "Saved!" : "Save Board"}
+                </button>
+                <button
+                  onClick={() => {
+                    setBingoEditing(false);
+                    const drafts = Array(25).fill("");
+                    bingoItems.forEach((item) => {
+                      if (item.position >= 0 && item.position < 25) {
+                        drafts[item.position] = item.title;
+                      }
+                    });
+                    setBingoDrafts(drafts);
+                  }}
+                  className="rounded-xl bg-gray-100 px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-5 gap-1.5">
+              {Array.from({ length: 25 }).map((_, i) => {
+                const item = bingoItems.find((b) => b.position === i);
+                return (
+                  <div
+                    key={i}
+                    className={`flex aspect-square items-center justify-center rounded-lg border p-1 text-center text-xs leading-tight ${
+                      item?.completed
+                        ? "border-pink-300 bg-pink-200 font-semibold text-pink-800"
+                        : item
+                          ? "border-gray-200 bg-gray-50 text-gray-600"
+                          : "border-gray-100 bg-gray-50 text-gray-300"
+                    }`}
+                  >
+                    <span className="line-clamp-3">{item?.title || ""}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {/* Telegram */}
         <section>
