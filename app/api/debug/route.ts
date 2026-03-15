@@ -1,6 +1,28 @@
 import { NextResponse } from "next/server";
 import { sql } from "@vercel/postgres";
 
+export async function POST() {
+  try {
+    // Fix weekly goal logs stored on non-Monday dates
+    // Sundays: move forward 1 day to Monday (likely off-by-one from AI)
+    // Other days: move back to Monday of that week
+    const { rowCount } = await sql`
+      UPDATE goal_logs gl
+      SET period_date = CASE
+        WHEN EXTRACT(DOW FROM gl.period_date) = 0 THEN (gl.period_date + 1)::date
+        ELSE date_trunc('week', gl.period_date)::date
+      END
+      FROM goal_definitions gd
+      WHERE gd.id = gl.goal_id
+        AND gd.frequency = 'weekly'
+        AND EXTRACT(DOW FROM gl.period_date) != 1
+    `;
+    return NextResponse.json({ fixed: rowCount });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
 export async function GET() {
   const checks: Record<string, string> = {};
 
@@ -29,13 +51,12 @@ export async function GET() {
       SELECT gl.id, gl.goal_id, gl.period_date, gl.completed, gl.value, gl.updated_at, gd.name, gd.frequency
       FROM goal_logs gl
       JOIN goal_definitions gd ON gd.id = gl.goal_id
-      WHERE gd.frequency = 'weekly'
       ORDER BY gl.updated_at DESC
-      LIMIT 20
+      LIMIT 30
     `;
-    checks.weekly_logs = JSON.stringify(rows);
+    checks.all_recent_logs = JSON.stringify(rows);
   } catch (err) {
-    checks.weekly_logs = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
+    checks.all_recent_logs = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
   }
 
   return NextResponse.json(checks, { status: 200 });
