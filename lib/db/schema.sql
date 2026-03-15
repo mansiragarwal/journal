@@ -1,9 +1,11 @@
 -- ============================================
 -- Multi-user Goal Journal Schema
+-- Safe to re-run: uses IF NOT EXISTS everywhere
+-- NEVER add DROP TABLE statements to this file
 -- ============================================
 
 -- Auth tables
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   name TEXT,
   email TEXT UNIQUE,
@@ -14,7 +16,7 @@ CREATE TABLE users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE accounts (
+CREATE TABLE IF NOT EXISTS accounts (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   type TEXT NOT NULL,
@@ -30,14 +32,14 @@ CREATE TABLE accounts (
   UNIQUE(provider, provider_account_id)
 );
 
-CREATE TABLE sessions (
+CREATE TABLE IF NOT EXISTS sessions (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
   session_token TEXT UNIQUE NOT NULL,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires TIMESTAMPTZ NOT NULL
 );
 
-CREATE TABLE verification_tokens (
+CREATE TABLE IF NOT EXISTS verification_tokens (
   identifier TEXT NOT NULL,
   token TEXT UNIQUE NOT NULL,
   expires TIMESTAMPTZ NOT NULL,
@@ -45,7 +47,7 @@ CREATE TABLE verification_tokens (
 );
 
 -- Goal definitions: user-defined goals with frequency and tracking type
-CREATE TABLE goal_definitions (
+CREATE TABLE IF NOT EXISTS goal_definitions (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -58,10 +60,10 @@ CREATE TABLE goal_definitions (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_goal_defs_user ON goal_definitions(user_id, frequency);
+CREATE INDEX IF NOT EXISTS idx_goal_defs_user ON goal_definitions(user_id, frequency);
 
 -- Goal logs: one entry per goal per period
-CREATE TABLE goal_logs (
+CREATE TABLE IF NOT EXISTS goal_logs (
   id SERIAL PRIMARY KEY,
   goal_id INTEGER NOT NULL REFERENCES goal_definitions(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -72,10 +74,10 @@ CREATE TABLE goal_logs (
   UNIQUE(goal_id, period_date)
 );
 
-CREATE INDEX idx_goal_logs_user_date ON goal_logs(user_id, period_date);
+CREATE INDEX IF NOT EXISTS idx_goal_logs_user_date ON goal_logs(user_id, period_date);
 
 -- Bingo items (per-user)
-CREATE TABLE bingo_items (
+CREATE TABLE IF NOT EXISTS bingo_items (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   position INTEGER NOT NULL,
@@ -87,7 +89,7 @@ CREATE TABLE bingo_items (
 );
 
 -- Body stats (per-user)
-CREATE TABLE body_stats (
+CREATE TABLE IF NOT EXISTS body_stats (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   category TEXT NOT NULL,
@@ -97,10 +99,10 @@ CREATE TABLE body_stats (
   recorded_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_body_stats_user ON body_stats(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_body_stats_user ON body_stats(user_id, name);
 
 -- Ideas (per-user)
-CREATE TABLE ideas (
+CREATE TABLE IF NOT EXISTS ideas (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   text TEXT NOT NULL,
@@ -108,14 +110,14 @@ CREATE TABLE ideas (
 );
 
 -- Telegram linking
-CREATE TABLE telegram_links (
+CREATE TABLE IF NOT EXISTS telegram_links (
   id SERIAL PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
   chat_id TEXT NOT NULL UNIQUE,
   linked_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE telegram_link_codes (
+CREATE TABLE IF NOT EXISTS telegram_link_codes (
   code TEXT PRIMARY KEY,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   expires_at TIMESTAMPTZ NOT NULL,
