@@ -54,7 +54,7 @@ Rules:
 - For measurable goals: ALWAYS extract the numeric value if mentioned (e.g. "1x", "twice", "2 times" = value 2). Set completed = true ONLY if value >= target. Partial progress (value < target) should still be logged with completed = false but with the value set.
 - For habits, set completed: true/false
 - The message may contain MULTIPLE dates/entries (e.g. separate lines for different days). Parse EACH date separately.
-- For date references like "yesterday", "3/12", "March 10", "Monday", "2 days ago" — compute date_offset as negative days from today. E.g. if today is 3/13 and they say 3/12, date_offset = -1. If today is 3/13 and they say 3/9, date_offset = -4. If no date is mentioned, date_offset = null (means today).
+- For date references like "yesterday", "3/12", "March 10", "Monday", "2 days ago" — compute date_offset as negative days from today. E.g. if today is 3/13 (Thursday) and they say "3/12", date_offset = -1. If they say "Monday", that's 3/10, so date_offset = -3. If they say "yesterday", date_offset = -1. Use the day-of-week in today's date to count back correctly. "Monday" always means the MOST RECENT Monday. If no date is mentioned, date_offset = null (means today).
 
 Respond with ONLY valid JSON array, no markdown. Each entry has a date_offset and the goal updates for that date:
 [{"date_offset": number|null, "updates": [{"goal_id": number, "completed": boolean, "value": number|null}]}]`,

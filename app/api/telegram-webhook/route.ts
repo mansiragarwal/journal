@@ -175,7 +175,8 @@ export async function POST(request: Request) {
 
       const now = new TZDate(new Date(), "America/New_York");
       const todayDateStr = format(now, "yyyy-MM-dd");
-      const dateGroups = await parseGoalReply(text, goals, frequency, todayDateStr);
+      const todayDow = format(now, "EEEE");
+      const dateGroups = await parseGoalReply(text, goals, frequency, `${todayDateStr} (${todayDow})`);
 
       const confirmations: string[] = [];
 
@@ -184,7 +185,7 @@ export async function POST(request: Request) {
         let dateLabel: string;
         if (group.date_offset != null && group.date_offset < 0) {
           const targetDate = subDays(now, Math.abs(group.date_offset));
-          pDate = format(targetDate, "yyyy-MM-dd");
+          pDate = periodDateFor(frequency, targetDate);
           dateLabel = format(targetDate, "MMM d");
         } else {
           pDate = periodDateFor(frequency);
