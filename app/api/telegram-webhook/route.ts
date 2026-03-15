@@ -183,13 +183,16 @@ export async function POST(request: Request) {
       for (const group of dateGroups) {
         let pDate: string;
         let dateLabel: string;
-        if (group.date_offset != null && group.date_offset < 0) {
+        if (frequency !== "daily") {
+          pDate = periodDateFor(frequency);
+          dateLabel = frequency === "weekly" ? "this week" : `this ${frequency.replace("ly", "")}`;
+        } else if (group.date_offset != null && group.date_offset < 0) {
           const targetDate = subDays(now, Math.abs(group.date_offset));
-          pDate = periodDateFor(frequency, targetDate);
+          pDate = format(targetDate, "yyyy-MM-dd");
           dateLabel = format(targetDate, "MMM d");
         } else {
           pDate = periodDateFor(frequency);
-          dateLabel = frequency === "daily" ? "today" : "this week";
+          dateLabel = "today";
         }
 
         for (const update of group.updates) {
