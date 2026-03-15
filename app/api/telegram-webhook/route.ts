@@ -33,20 +33,21 @@ function detectType(text: string): MsgType {
   if (/^(stats|show stats|my stats)$/i.test(lower.trim())) return "show_stats";
   if (lower.startsWith("idea:") || lower.startsWith("idea ")) return "idea";
 
+  const bingoKeywords = ["bingo", "bucket list", "crossed off", "checked off"];
+  if (bingoKeywords.some((kw) => lower.includes(kw))) return "bingo";
+
+  const weeklyKeywords = ["yoga", "pilates", "weightlift", "lifted", "gym", "this week", "weekly"];
+  if (weeklyKeywords.some((kw) => lower.includes(kw))) return "weekly";
+
   const statsKeywords = [
-    "weigh", "weight:", "lbs", "kg",
+    "weight:", "weighed", "lbs", "kg",
     "bench", "squat", "deadlift", "hip thrust", "press",
     "curl", "row", "lift:",
     "waist", "hips", "chest", "bicep", "thigh", "calf",
     "inches", "inch", "cm", "measurement",
   ];
   if (statsKeywords.some((kw) => lower.includes(kw))) return "stats";
-
-  const bingoKeywords = ["bingo", "bucket list", "crossed off", "checked off"];
-  if (bingoKeywords.some((kw) => lower.includes(kw))) return "bingo";
-
-  const weeklyKeywords = ["yoga", "pilates", "weightlift", "lifted", "gym", "this week", "weekly"];
-  if (weeklyKeywords.some((kw) => lower.includes(kw))) return "weekly";
+  if (/\bweigh\b/.test(lower)) return "stats";
 
   return "daily";
 }
