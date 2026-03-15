@@ -24,5 +24,19 @@ export async function GET() {
     checks.tables = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
   }
 
+  try {
+    const { rows } = await sql`
+      SELECT gl.id, gl.goal_id, gl.period_date, gl.completed, gl.value, gl.updated_at, gd.name, gd.frequency
+      FROM goal_logs gl
+      JOIN goal_definitions gd ON gd.id = gl.goal_id
+      WHERE gd.frequency = 'weekly'
+      ORDER BY gl.updated_at DESC
+      LIMIT 20
+    `;
+    checks.weekly_logs = JSON.stringify(rows);
+  } catch (err) {
+    checks.weekly_logs = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
   return NextResponse.json(checks, { status: 200 });
 }
