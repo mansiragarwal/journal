@@ -201,8 +201,11 @@ export async function POST(request: Request) {
         const done = group.updates.filter((p) => p.completed).length;
         const items = goals.map((g) => {
           const upd = group.updates.find((p) => p.goal_id === g.id);
-          const check = upd?.completed ? "✅" : "⬜";
-          const extra = g.tracking_type === "number" && upd?.value != null ? ` (${upd.value})` : "";
+          const check = upd?.completed ? "✅" : upd?.value != null && upd.value > 0 ? "🔶" : "⬜";
+          let extra = "";
+          if (g.tracking_type === "number" && upd?.value != null) {
+            extra = g.target_value ? ` (${upd.value}/${g.target_value}${g.unit ? " " + g.unit : ""})` : ` (${upd.value})`;
+          }
           return `${check} ${g.name}${extra}`;
         });
 

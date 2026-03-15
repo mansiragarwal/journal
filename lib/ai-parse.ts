@@ -51,7 +51,7 @@ Rules:
 - If they say "nothing" / "nope" / "no" -> none completed
 - If they say "only X and Y" -> only those completed
 - If they say "everything except X" -> all except those completed
-- For measurable goals, extract the numeric value if mentioned
+- For measurable goals: ALWAYS extract the numeric value if mentioned (e.g. "1x", "twice", "2 times" = value 2). Set completed = true ONLY if value >= target. Partial progress (value < target) should still be logged with completed = false but with the value set.
 - For habits, set completed: true/false
 - The message may contain MULTIPLE dates/entries (e.g. separate lines for different days). Parse EACH date separately.
 - For date references like "yesterday", "3/12", "March 10", "Monday", "2 days ago" — compute date_offset as negative days from today. E.g. if today is 3/13 and they say 3/12, date_offset = -1. If today is 3/13 and they say 3/9, date_offset = -4. If no date is mentioned, date_offset = null (means today).
