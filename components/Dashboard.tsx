@@ -8,6 +8,7 @@ import { StreakCalendar } from "./StreakCalendar";
 import { BingoBoard } from "./BingoBoard";
 import { StatsPanel } from "./StatsPanel";
 import { IdeasList } from "./IdeasList";
+import { WeeklyProgress } from "./WeeklyProgress";
 import type { BingoItem } from "@/lib/utils";
 
 interface Props {
@@ -74,6 +75,7 @@ export function Dashboard({ streak, bingoItems, userName, todayDate }: Props) {
         </div>
 
         <aside className="space-y-4">
+          <WeeklyProgress />
           <StatsPanel />
           <IdeasList />
         </aside>
