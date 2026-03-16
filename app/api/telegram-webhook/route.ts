@@ -6,6 +6,7 @@ import {
   redeemTelegramLinkCode,
   getGoalDefinitions,
   upsertGoalLog,
+  getGoalsWithLogs,
   getBingoItems,
   updateBingoItem,
   addBodyStat,
@@ -202,18 +203,25 @@ export async function POST(request: Request) {
           });
         }
 
-        const done = group.updates.filter((p) => p.completed).length;
-        const items = goals.map((g) => {
-          const upd = group.updates.find((p) => p.goal_id === g.id);
-          const check = upd?.completed ? "✅" : upd?.value != null && upd.value > 0 ? "🔶" : "⬜";
+        const current = await getGoalsWithLogs(userId, frequency, pDate);
+        const done = current.filter((g) => {
+          if (!g.log) return false;
+          if (g.tracking_type === "boolean") return g.log.completed;
+          if (g.target_value && g.log.value != null) return g.log.value >= g.target_value;
+          return (g.log.value ?? 0) > 0;
+        }).length;
+        const items = current.map((g) => {
+          const isComplete = g.log?.completed || (g.tracking_type === "number" && g.target_value && g.log?.value != null && g.log.value >= g.target_value);
+          const hasPartial = g.tracking_type === "number" && g.log?.value != null && g.log.value > 0 && !isComplete;
+          const check = isComplete ? "✅" : hasPartial ? "🔶" : g.log?.completed ? "✅" : "⬜";
           let extra = "";
-          if (g.tracking_type === "number" && upd?.value != null) {
-            extra = g.target_value ? ` (${upd.value}/${g.target_value}${g.unit ? " " + g.unit : ""})` : ` (${upd.value})`;
+          if (g.tracking_type === "number" && g.log?.value != null) {
+            extra = g.target_value ? ` (${g.log.value}/${g.target_value}${g.unit ? " " + g.unit : ""})` : ` (${g.log.value})`;
           }
           return `${check} ${g.name}${extra}`;
         });
 
-        confirmations.push(`${dateLabel}: ${done}/${goals.length}\n${items.join("\n")}`);
+        confirmations.push(`${dateLabel}: ${done}/${current.length}\n${items.join("\n")}`);
       }
 
       await sendMessage(chatId, `Got it!\n\n${confirmations.join("\n\n")}`);
