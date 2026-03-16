@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { startOfWeek, format } from "date-fns";
+import { useEffect, useState, useCallback } from "react";
+import { startOfWeek, addWeeks, format, isSameWeek } from "date-fns";
 import type { GoalWithLog } from "@/lib/utils";
 
 export function WeeklyProgress() {
   const [goals, setGoals] = useState<GoalWithLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [weekOffset, setWeekOffset] = useState(0);
 
-  useEffect(() => {
-    const weekStart = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
-    fetch(`/api/goals/log?frequency=weekly&period_date=${weekStart}`)
+  const now = new Date();
+  const weekDate = addWeeks(startOfWeek(now, { weekStartsOn: 1 }), weekOffset);
+  const weekStart = format(weekDate, "yyyy-MM-dd");
+  const isCurrentWeek = isSameWeek(weekDate, now, { weekStartsOn: 1 });
+
+  const fetchWeek = useCallback((date: string) => {
+    setLoading(true);
+    fetch(`/api/goals/log?frequency=weekly&period_date=${date}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) setGoals(data);
@@ -19,7 +25,15 @@ export function WeeklyProgress() {
       .catch(() => setLoading(false));
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    fetchWeek(weekStart);
+  }, [weekStart, fetchWeek]);
+
+  const weekLabel = isCurrentWeek
+    ? "This Week"
+    : `Week of ${format(weekDate, "MMM d")}`;
+
+  if (loading && goals.length === 0) {
     return (
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm animate-pulse">
         <div className="h-4 w-24 rounded bg-gray-200" />
@@ -42,13 +56,34 @@ export function WeeklyProgress() {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900">This Week</h3>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setWeekOffset((o) => o - 1)}
+            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            aria-label="Previous week"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <h3 className="text-sm font-semibold text-gray-900">{weekLabel}</h3>
+          <button
+            onClick={() => setWeekOffset((o) => o + 1)}
+            disabled={isCurrentWeek}
+            className="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 disabled:invisible"
+            aria-label="Next week"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
         <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
           {completed}/{goals.length}
         </span>
       </div>
 
-      <div className="space-y-2">
+      <div className={`space-y-2 ${loading ? "opacity-50" : ""}`}>
         {goals.map((goal) => {
           const isNumeric = goal.tracking_type === "number";
           const value = goal.log?.value ?? 0;
@@ -74,7 +109,7 @@ export function WeeklyProgress() {
                         : "bg-gray-200 text-gray-400"
                   }`}
                 >
-                  {done ? "✓" : isNumeric && value > 0 ? "" : ""}
+                  {done ? "✓" : ""}
                 </span>
                 <span className={`flex-1 truncate text-sm ${done ? "text-gray-700 font-medium" : "text-gray-500"}`}>
                   {goal.name}
