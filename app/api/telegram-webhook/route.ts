@@ -167,7 +167,7 @@ export async function POST(request: Request) {
       }
     } else {
       // daily or weekly goal update
-      const frequency = type === "weekly" ? "weekly" : "daily";
+      const frequency: string = type === "weekly" ? "weekly" : "daily";
       const goals = await getGoalDefinitions(userId, frequency);
       if (goals.length === 0) {
         await sendMessage(chatId, `No ${frequency} goals defined. Set them up in the web app.`);
