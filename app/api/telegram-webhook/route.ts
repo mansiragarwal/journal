@@ -15,7 +15,7 @@ import {
   getIdeas,
 } from "@/lib/db";
 import { periodDateFor } from "@/lib/utils";
-import { subDays, format } from "date-fns";
+import { subDays, subWeeks, format, startOfWeek } from "date-fns";
 import { TZDate } from "@date-fns/tz";
 
 interface TelegramUpdate {
@@ -37,7 +37,7 @@ function detectType(text: string): MsgType {
   const bingoKeywords = ["bingo", "bucket list", "crossed off", "checked off"];
   if (bingoKeywords.some((kw) => lower.includes(kw))) return "bingo";
 
-  const weeklyKeywords = ["yoga", "pilates", "weightlift", "lifted", "gym", "this week", "weekly"];
+  const weeklyKeywords = ["yoga", "pilates", "weightlift", "lifted", "gym", "this week", "last week", "weekly", "clean"];
   if (weeklyKeywords.some((kw) => lower.includes(kw))) return "weekly";
 
   const statsKeywords = [
@@ -184,9 +184,19 @@ export async function POST(request: Request) {
       for (const group of dateGroups) {
         let pDate: string;
         let dateLabel: string;
-        if (frequency !== "daily") {
+        if (frequency === "weekly") {
+          const isLastWeek = /last week/i.test(text);
+          if (isLastWeek) {
+            const lastWeekDate = subWeeks(now, 1);
+            pDate = format(startOfWeek(lastWeekDate, { weekStartsOn: 1 }), "yyyy-MM-dd");
+            dateLabel = `week of ${format(startOfWeek(lastWeekDate, { weekStartsOn: 1 }), "MMM d")}`;
+          } else {
+            pDate = periodDateFor(frequency);
+            dateLabel = "this week";
+          }
+        } else if (frequency !== "daily") {
           pDate = periodDateFor(frequency);
-          dateLabel = frequency === "weekly" ? "this week" : `this ${frequency.replace("ly", "")}`;
+          dateLabel = `this ${frequency.replace("ly", "")}`;
         } else if (group.date_offset != null && group.date_offset < 0) {
           const targetDate = subDays(now, Math.abs(group.date_offset));
           pDate = format(targetDate, "yyyy-MM-dd");
