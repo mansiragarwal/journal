@@ -3,21 +3,89 @@ import { sql } from "@vercel/postgres";
 
 export async function POST() {
   try {
-    // Fix weekly goal logs stored on non-Monday dates
-    // Sundays: move forward 1 day to Monday (likely off-by-one from AI)
-    // Other days: move back to Monday of that week
-    const { rowCount } = await sql`
-      UPDATE goal_logs gl
-      SET period_date = CASE
-        WHEN EXTRACT(DOW FROM gl.period_date) = 0 THEN (gl.period_date + 1)::date
-        ELSE date_trunc('week', gl.period_date)::date
-      END
-      FROM goal_definitions gd
-      WHERE gd.id = gl.goal_id
-        AND gd.frequency = 'weekly'
-        AND EXTRACT(DOW FROM gl.period_date) != 1
+    const results: string[] = [];
+
+    // Get the first user
+    const { rows: users } = await sql`SELECT id FROM users LIMIT 1`;
+    if (users.length === 0) return NextResponse.json({ error: "No users" }, { status: 400 });
+    const userId = users[0].id;
+
+    // Deactivate old daily goals that are being removed
+    const deactivateDaily = ["10k steps", "Brainstorming 30 mins", "Walk after meals", "Meditate"];
+    for (const name of deactivateDaily) {
+      const { rowCount } = await sql`
+        UPDATE goal_definitions SET active = false
+        WHERE user_id = ${userId} AND frequency = 'daily' AND LOWER(name) = LOWER(${name}) AND active = true
+      `;
+      if (rowCount && rowCount > 0) results.push(`Deactivated daily: ${name}`);
+    }
+
+    // Deactivate old weekly goals being removed
+    const { rowCount: cleanDeactivated } = await sql`
+      UPDATE goal_definitions SET active = false
+      WHERE user_id = ${userId} AND frequency = 'weekly' AND LOWER(name) LIKE '%clean%' AND active = true
     `;
-    return NextResponse.json({ fixed: rowCount });
+    if (cleanDeactivated && cleanDeactivated > 0) results.push("Deactivated weekly: Clean 10 mins");
+
+    // Add new daily goals
+    const newDaily = [
+      { name: "15k steps", tracking_type: "boolean" },
+      { name: "Read before bed", tracking_type: "boolean" },
+      { name: "Consistent sleep schedule", tracking_type: "boolean" },
+      { name: "Skincare & dental care", tracking_type: "boolean" },
+      { name: "30 mins creative time", tracking_type: "boolean" },
+    ];
+    for (const g of newDaily) {
+      const { rows: existing } = await sql`
+        SELECT id FROM goal_definitions
+        WHERE user_id = ${userId} AND frequency = 'daily' AND LOWER(name) = LOWER(${g.name}) AND active = true
+      `;
+      if (existing.length === 0) {
+        await sql`
+          INSERT INTO goal_definitions (user_id, name, frequency, tracking_type)
+          VALUES (${userId}, ${g.name}, 'daily', ${g.tracking_type})
+        `;
+        results.push(`Added daily: ${g.name}`);
+      } else {
+        results.push(`Already exists daily: ${g.name}`);
+      }
+    }
+
+    // Update weekly: Weightlifting target 3 -> 2
+    const { rowCount: wlUpdated } = await sql`
+      UPDATE goal_definitions SET target_value = 2
+      WHERE user_id = ${userId} AND frequency = 'weekly' AND LOWER(name) LIKE '%weightlift%' AND active = true
+    `;
+    if (wlUpdated && wlUpdated > 0) results.push("Updated Weightlifting target: 3 -> 2");
+
+    // Update Yoga to target 1 (if numeric) or keep as boolean
+    const { rows: yogaRows } = await sql`
+      SELECT id, tracking_type FROM goal_definitions
+      WHERE user_id = ${userId} AND frequency = 'weekly' AND LOWER(name) = 'yoga' AND active = true
+    `;
+    if (yogaRows.length > 0 && yogaRows[0].tracking_type === 'number') {
+      await sql`UPDATE goal_definitions SET target_value = 1 WHERE id = ${yogaRows[0].id}`;
+      results.push("Updated Yoga target: -> 1");
+    }
+
+    // Update Pilates to target 1 (if numeric) or keep as boolean
+    const { rows: pilatesRows } = await sql`
+      SELECT id, tracking_type FROM goal_definitions
+      WHERE user_id = ${userId} AND frequency = 'weekly' AND LOWER(name) = 'pilates' AND active = true
+    `;
+    if (pilatesRows.length > 0 && pilatesRows[0].tracking_type === 'number') {
+      await sql`UPDATE goal_definitions SET target_value = 1 WHERE id = ${pilatesRows[0].id}`;
+      results.push("Updated Pilates target: -> 1");
+    }
+
+    // Verify final state
+    const { rows: finalGoals } = await sql`
+      SELECT name, frequency, tracking_type, target_value, active
+      FROM goal_definitions WHERE user_id = ${userId} AND active = true
+      ORDER BY frequency, sort_order, id
+    `;
+
+    return NextResponse.json({ actions: results, active_goals: finalGoals });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
