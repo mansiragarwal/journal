@@ -225,7 +225,11 @@ export async function POST(request: Request) {
           const hasPartial = g.tracking_type === "number" && g.log?.value != null && g.log.value > 0 && !isComplete;
           const check = isComplete ? "✅" : hasPartial ? "🔶" : g.log?.completed ? "✅" : "⬜";
           let extra = "";
-          if (g.tracking_type === "number" && g.log?.value != null) {
+          if (g.unit === "steps" && g.log?.value != null) {
+            const v = g.log.value;
+            const tier = v >= 15000 ? "🏆 15k!" : v >= 10000 ? "💪 10k" : v >= 8000 ? "👟 8k" : `${v}`;
+            extra = ` (${tier})`;
+          } else if (g.tracking_type === "number" && g.log?.value != null) {
             extra = g.target_value ? ` (${g.log.value}/${g.target_value}${g.unit ? " " + g.unit : ""})` : ` (${g.log.value})`;
           }
           return `${check} ${g.name}${extra}`;

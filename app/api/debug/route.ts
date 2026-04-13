@@ -28,8 +28,8 @@ export async function POST() {
     if (cleanDeactivated && cleanDeactivated > 0) results.push("Deactivated weekly: Clean 10 mins");
 
     // Add new daily goals
-    const newDaily = [
-      { name: "15k steps", tracking_type: "boolean" },
+    const newDaily: { name: string; tracking_type: string; target_value?: number; unit?: string }[] = [
+      { name: "Steps", tracking_type: "number", target_value: 15000, unit: "steps" },
       { name: "Read before bed", tracking_type: "boolean" },
       { name: "Consistent sleep schedule", tracking_type: "boolean" },
       { name: "Skincare & dental care", tracking_type: "boolean" },
@@ -42,8 +42,8 @@ export async function POST() {
       `;
       if (existing.length === 0) {
         await sql`
-          INSERT INTO goal_definitions (user_id, name, frequency, tracking_type)
-          VALUES (${userId}, ${g.name}, 'daily', ${g.tracking_type})
+          INSERT INTO goal_definitions (user_id, name, frequency, tracking_type, target_value, unit)
+          VALUES (${userId}, ${g.name}, 'daily', ${g.tracking_type}, ${g.target_value ?? null}, ${g.unit ?? null})
         `;
         results.push(`Added daily: ${g.name}`);
       } else {
@@ -91,9 +91,64 @@ export async function POST() {
   }
 }
 
-export async function GET() {
-  const checks: Record<string, string> = {};
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const email = searchParams.get("email");
 
+  if (email) {
+    try {
+      const { rows: users } = await sql`SELECT id, name, email, onboarding_complete, created_at FROM users WHERE email = ${email}`;
+      if (users.length === 0) return NextResponse.json({ error: "User not found" }, { status: 404 });
+      const userId = users[0].id;
+
+      const { rows: goalDefs } = await sql`
+        SELECT id, name, frequency, tracking_type, target_value, unit, active, created_at
+        FROM goal_definitions WHERE user_id = ${userId}
+        ORDER BY active DESC, frequency, sort_order, id
+      `;
+
+      const { rows: goalLogs } = await sql`
+        SELECT gl.id, gl.goal_id, gd.name as goal_name, gd.frequency, gl.period_date, gl.completed, gl.value, gl.updated_at
+        FROM goal_logs gl
+        JOIN goal_definitions gd ON gd.id = gl.goal_id
+        WHERE gl.user_id = ${userId}
+        ORDER BY gl.period_date DESC, gd.frequency, gd.id
+      `;
+
+      const { rows: bingoItems } = await sql`
+        SELECT id, position, title, completed, completed_at FROM bingo_items
+        WHERE user_id = ${userId} ORDER BY position
+      `;
+
+      const { rows: bodyStats } = await sql`
+        SELECT id, category, name, value, unit, recorded_at FROM body_stats
+        WHERE user_id = ${userId} ORDER BY recorded_at DESC
+      `;
+
+      const { rows: ideas } = await sql`
+        SELECT id, text, created_at FROM ideas
+        WHERE user_id = ${userId} ORDER BY created_at DESC
+      `;
+
+      const { rows: telegramLink } = await sql`
+        SELECT chat_id, linked_at FROM telegram_links WHERE user_id = ${userId}
+      `;
+
+      return NextResponse.json({
+        user: users[0],
+        goal_definitions: goalDefs,
+        goal_logs: goalLogs,
+        bingo_items: bingoItems,
+        body_stats: bodyStats,
+        ideas,
+        telegram: telegramLink[0] ?? null,
+      });
+    } catch (err) {
+      return NextResponse.json({ error: String(err) }, { status: 500 });
+    }
+  }
+
+  const checks: Record<string, string> = {};
   checks.AUTH_SECRET = process.env.AUTH_SECRET ? "set" : "MISSING";
   checks.AUTH_URL = process.env.AUTH_URL ?? "MISSING";
   checks.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? `set (${process.env.GOOGLE_CLIENT_ID.slice(0, 10)}...)` : "MISSING";
@@ -105,26 +160,6 @@ export async function GET() {
     checks.db_connection = `ok (${rows[0].count} users)`;
   } catch (err) {
     checks.db_connection = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
-  }
-
-  try {
-    const { rows } = await sql`SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename`;
-    checks.tables = rows.map((r) => r.tablename).join(", ");
-  } catch (err) {
-    checks.tables = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
-  }
-
-  try {
-    const { rows } = await sql`
-      SELECT gl.id, gl.goal_id, gl.period_date, gl.completed, gl.value, gl.updated_at, gd.name, gd.frequency
-      FROM goal_logs gl
-      JOIN goal_definitions gd ON gd.id = gl.goal_id
-      ORDER BY gl.updated_at DESC
-      LIMIT 30
-    `;
-    checks.all_recent_logs = JSON.stringify(rows);
-  } catch (err) {
-    checks.all_recent_logs = `FAILED: ${err instanceof Error ? err.message : String(err)}`;
   }
 
   return NextResponse.json(checks, { status: 200 });

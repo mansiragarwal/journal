@@ -166,14 +166,16 @@ export function GoalCard({ title, frequency, periodDate, goals: initialGoals }: 
                 )}
               </div>
 
-              {progressPct !== null && (
+              {progressPct !== null && goal.unit === "steps" ? (
+                <StepsTierBar value={goal.log?.value ?? 0} />
+              ) : progressPct !== null ? (
                 <div className="mx-4 mt-1 h-1.5 rounded-full bg-gray-200 overflow-hidden">
                   <div
                     className={`h-full rounded-full ${colors.bg} transition-all`}
                     style={{ width: `${progressPct}%` }}
                   />
                 </div>
-              )}
+              ) : null}
             </div>
           );
         })}
@@ -186,6 +188,48 @@ export function GoalCard({ title, frequency, periodDate, goals: initialGoals }: 
       >
         {isPending ? "Saving..." : saved ? "Saved!" : "Save Progress"}
       </button>
+    </div>
+  );
+}
+
+const STEP_TIERS = [
+  { threshold: 8000, label: "8k", color: "bg-amber-400" },
+  { threshold: 10000, label: "10k", color: "bg-emerald-400" },
+  { threshold: 15000, label: "15k", color: "bg-violet-500" },
+];
+
+function StepsTierBar({ value }: { value: number }) {
+  const max = 15000;
+  const pct = Math.min(100, (value / max) * 100);
+  const currentTier = STEP_TIERS.filter((t) => value >= t.threshold).pop();
+  const barColor = currentTier?.color ?? "bg-gray-300";
+
+  return (
+    <div className="mx-4 mt-1.5">
+      <div className="relative h-2 rounded-full bg-gray-200 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${barColor} transition-all`}
+          style={{ width: `${pct}%` }}
+        />
+        {STEP_TIERS.map((tier) => (
+          <div
+            key={tier.threshold}
+            className="absolute top-0 h-full w-px bg-gray-400/50"
+            style={{ left: `${(tier.threshold / max) * 100}%` }}
+          />
+        ))}
+      </div>
+      <div className="relative mt-0.5 flex text-[10px] text-gray-400">
+        {STEP_TIERS.map((tier) => (
+          <span
+            key={tier.threshold}
+            className={`absolute -translate-x-1/2 ${value >= tier.threshold ? "font-semibold text-gray-600" : ""}`}
+            style={{ left: `${(tier.threshold / max) * 100}%` }}
+          >
+            {tier.label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
